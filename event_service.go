@@ -23,12 +23,13 @@ var (
 
 func main() {
     http.HandleFunc("/events", handleEvents)
-    http.HandleFunc("/event/", handleEvent)
+    http.HandleFunc("/event/", handleEventByID)
 
     port := os.Getenv("PORT")
     if port == "" {
         port = "8080"
     }
+
     log.Printf("Server starting on port %s\n", port)
     if err := http.ListenAndServe(":"+port, nil); err != nil {
         log.Fatalf("Failed to start server: %v", err)
@@ -36,12 +37,12 @@ func main() {
 }
 
 func handleEvents(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
     switch r.Method {
     case "POST":
         var event Event
         if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
             http.Error(w, "Invalid request body", http.StatusBadRequest)
-            log.Printf("Error decoding event: %v\n", err)
             return
         }
 
@@ -52,10 +53,11 @@ func handleEvents(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(http.StatusCreated)
         if err := json.NewEncoder(w).Encode(event); err != nil {
             log.Printf("Error encoding event: %v\n", err)
+            http.Error(w, "Failed to encode event", http.StatusInternalServerError)
         }
     case "GET":
         mu.RLock()
-        var allEvents []Event
+        allEvents := make([]Event, 0, len(events))
         for _, event := range events {
             allEvents = append(allEvents, event)
         }
@@ -63,19 +65,21 @@ func handleEvents(w http.ResponseWriter, r *http.Request) {
 
         if err := json.NewEncoder(w).Encode(allEvents); err != nil {
             log.Printf("Error encoding all events: %v\n", err)
+            http.Error(w, "Failed to encode events list", http.StatusInternalServerError)
         }
     default:
         w.WriteHeader(http.StatusMethodNotAllowed)
     }
 }
 
-func handleEvent(w http.ResponseWriter, r *http.Request) {
+func handleEventByID(w http.ResponseWriter, r *http.Request) {
     id := r.URL.Path[len("/event/"):]
 
     mu.RLock()
     event, ok := events[id]
     mu.RUnlock()
 
+    w.Header().Set("Content-Type", "application/json")
     if !ok {
         http.NotFound(w, r)
         return
@@ -85,12 +89,12 @@ func handleEvent(w http.ResponseWriter, r *http.Request) {
     case "GET":
         if err := json.NewEncoder(w).Encode(event); err != nil {
             log.Printf("Error encoding event: %v\n", err)
+            http.Error(w, "Failed to encode the event", http.StatusInternalServerError)
         }
     case "PUT":
         var updatedEvent Event
         if err := json.NewDecoder(r.Body).Decode(&updatedEvent); err != nil {
             http.Error(w, "Invalid request body", http.StatusBadRequest)
-            log.Printf("Error decoding updated event: %v\n", err)
             return
         }
         updatedEvent.ID = id
@@ -101,6 +105,7 @@ func handleEvent(w http.ResponseWriter, r *http.Request) {
 
         if err := json.NewEncoder(w).Encode(updatedEvent); err != nil {
             log.Printf("Error encoding updated event: %v\n", err)
+            http.Error(w, "Failed to encode updated event", http.StatusInternalServerError)
         }
     case "DELETE":
         mu.Lock()
