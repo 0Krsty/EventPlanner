@@ -26,47 +26,48 @@ class EventsModule {
         this.baseUrl = process.env.API_BASE_URL ?? 'http://localhost:3000';
     }
 
+    private async postRequest<T>(url: string, data: T): Promise<T> {
+        const response = await axios.post(url, data);
+        console.log(`Operation successfully for: ${url}`, response.data);
+        return response.data;
+    }
+
+    private async getRequest<T>(url: string): Promise<T> {
+        const response = await axios.get(url);
+        console.log(`Operation successfully for: ${url}`, response.data);
+        return response.data;
+    }
+
     async createEvent(event: Event): Promise<Event> {
-        try {
-            const response = await axios.post(`${this.baseUrl}/events`, event);
-            console.log('Event created successfully:', response.data);
-            return response.data;
-        } catch (error) {
-            console.error('Error creating event:', error);
-            throw error;
-        }
+        return this.postRequest(`${this.baseUrl}/events`, event)
+            .catch(error => {
+                console.error('Error creating event:', error);
+                throw error;
+            });
     }
 
     async registerParticipant(eventId: string, participant: Participant): Promise<Participant> {
-        try {
-            const response = await axios.post(`${this.baseUrl}/events/${eventId}/participants`, participant);
-            console.log('Participant registered successfully:', response.data);
-            return response.data;
-        } catch (error) {
-            console.error('Error registering participant:', error);
-            throw error;
-        }
+        return this.postRequest(`${this.baseUrl}/events/${eventId}/participants`, participant)
+            .catch(error => {
+                console.error('Error registering participant:', error);
+                throw error;
+            });
     }
 
     async addVendor(eventId: string, vendor: Vendor): Promise<Vendor> {
-        try {
-            const response = await axios.post(`${this.baseUrl}/events/${eventId}/vendors`, vendor);
-            console.log('Vendor added successfully:', response.data);
-            return response.data;
-        } catch (error) {
-            console.error('Error adding vendor:', error);
-            throw error;
-        }
+        return this.postRequest(`${this.baseUrl}/events/${eventId}/vendors`, vendor)
+            .catch(error => {
+                console.error('Error adding vendor:', error);
+                throw error;
+            });
     }
 
     async listEvents(): Promise<Event[]> {
-        try {
-            const response = await axios.get(`${this.baseUrl}/events`);
-            return response.data;
-        } catch (error) {
-            console.error('Error listing events:', error);
-            throw error;
-        }
+        return this.getRequest<Event[]>(`${this.baseUrl}/events`)
+            .catch(error => {
+                console.error('Error listing events:', error);
+                throw error;
+            });
     }
 }
 
