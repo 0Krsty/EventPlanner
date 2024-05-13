@@ -2,6 +2,7 @@ package main
 
 import (
     "encoding/json"
+    "fmt"
     "log"
     "net/http"
     "os"
@@ -42,11 +43,20 @@ func handleEvents(w http.ResponseWriter, r *http.Request) {
     case "POST":
         var event Event
         if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
-            http.Error(w, "Invalid request body", http.StatusBadRequest)
+            errorMsg := fmt.Sprintf("Invalid request body: %v", err)
+            log.Println(errorMsg)
+            http.Error(w, errorMsg, http.StatusBadRequest)
             return
         }
 
         mu.Lock()
+        if _, exists := events[event.ID]; exists {
+            errorMsg := fmt.Sprintf("Event with ID '%s' already exists", event.ID)
+            log.Println(errorMsg)
+            http.Error(w, errorMsg, http.StatusConflict)
+            mu.Unlock()
+            return
+        }
         events[event.ID] = event
         mu.Unlock()
 
@@ -81,7 +91,9 @@ func handleEventByID(w http.ResponseWriter, r *http.Request) {
 
     w.Header().Set("Content-Type", "application/json")
     if !ok {
-        http.NotFound(w, r)
+        errorMsg := fmt.Sprintf("Event with ID '%s' not found", id)
+        log.Println(errorMsg)
+        http.Error(w, errorMsg, http.StatusNotFound)
         return
     }
 
@@ -94,9 +106,12 @@ func handleEventByID(w http.ResponseWriter, r *http.Request) {
     case "PUT":
         var updatedEvent Event
         if err := json.NewDecoder(r.Body).Decode(&updatedEvent); err != nil {
-            http.Error(w, "Invalid request body", http.StatusBadRequest)
+            errorMsg := fmt.Sprintf("Invalid request body: %v", err)
+            log.Println(errorMsg)
+            http.Error(w, errorMsg, http.StatusBadRequest)
             return
         }
+
         updatedEvent.ID = id
 
         mu.Lock()
