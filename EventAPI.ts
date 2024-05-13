@@ -19,8 +19,25 @@ interface Vendor {
     serviceProvided: string;
 }
 
+class Cache<T> {
+    private cache: Map<string, T> = new Map<string, T>();
+
+    get(key: string): T | undefined {
+        return this.cache.get(key);
+    }
+
+    set(key: string, value: T): void {
+        this.cache.set(key, value);
+    }
+
+    clear(): void {
+        this.cache.clear();
+    }
+}
+
 class EventsModule {
     private readonly baseUrl: string;
+    private eventsCache = new Cache<Event[]>();
 
     constructor() {
         this.baseUrl = process.env.API_BASE_URL ?? 'http://localhost:3000';
@@ -28,18 +45,33 @@ class EventsModule {
 
     private async postRequest<T>(url: string, data: T): Promise<T> {
         const response = await axios.post(url, data);
+        if (url.includes("/events")) {
+            this.eventsCache.clear(); // Invalidate cache as data has changed
+        }
         console.log(`Operation successfully for: ${url}`, response.data);
         return response.data;
     }
 
     private async getRequest<T>(url: string): Promise<T> {
+        if (url === `${this.baseUrl}/events`) {
+            const cachedEvents = this.eventsCache.get(url);
+            if (cachedEvents) {
+                return Promise.resolve(cachedEvents);
+            }
+        }
+
         const response = await axios.get(url);
         console.log(`Operation successfully for: ${url}`, response.data);
+        
+        if (url === `${this.baseUrl}/events`) {
+            this.eventsCache.set(url, response.data);
+        }
+        
         return response.data;
     }
 
     async createEvent(event: Event): Promise<Event> {
-        return this.postRequest(`${this.baseUrl}/events`, event)
+        return this.postRequest<Event>(`${this.baseUrl}/events`, event)
             .catch(error => {
                 console.error('Error creating event:', error);
                 throw error;
@@ -47,7 +79,7 @@ class EventsModule {
     }
 
     async registerParticipant(eventId: string, participant: Participant): Promise<Participant> {
-        return this.postRequest(`${this.baseUrl}/events/${eventId}/participants`, participant)
+        return this.postRequest<Participant>(`${this.baseUrl}/events/${eventId}/participants`, participant)
             .catch(error => {
                 console.error('Error registering participant:', error);
                 throw error;
@@ -55,7 +87,7 @@ class EventsModule {
     }
 
     async addVendor(eventId: string, vendor: Vendor): Promise<Vendor> {
-        return this.postRequest(`${this.baseUrl}/events/${eventId}/vendors`, vendor)
+        return this.postRequest<Vendor>(`${this.baseUrl}/events/${eventId}/vendors`, vendor)
             .catch(error => {
                 console.error('Error adding vendor:', error);
                 throw error;
