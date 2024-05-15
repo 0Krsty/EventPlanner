@@ -43,63 +43,45 @@ class EventsModule {
         this.baseUrl = process.env.API_BASE_URL ?? 'http://localhost:3000';
     }
 
-    private async postRequest<T>(url: string, data: T): Promise<T> {
-        const response = await axios.post(url, data);
-        if (url.includes("/events")) {
-            this.eventsCache.clear(); // Invalidate cache as data has changed
-        }
-        console.log(`Operation successfully for: ${url}`, response.data);
-        return response.data;
-    }
-
-    private async getRequest<T>(url: string): Promise<T> {
-        if (url === `${this.baseUrl}/events`) {
-            const cachedEvents = this.eventsCache.get(url);
-            if (cachedEvents) {
-                return Promise.resolve(cachedEvents);
+    private async makeRequest<T>(url: string, method: 'get' | 'post', data?: any): Promise<T> {
+        try {
+            const response = await axios({ url, method, data });
+            if (url.includes("/events")) {
+                this.eventsCache.clear(); // Invalidate cache as data might have changed
             }
-        }
+            console.log(`Operation successful for: ${url}`, response.data);
 
-        const response = await axios.get(url);
-        console.log(`Operation successfully for: ${url}`, response.data);
-        
-        if (url === `${this.baseUrl}/events`) {
-            this.eventsCache.set(url, response.data);
+            // Cache if a GET request to /events
+            if (method === 'get' && url === `${this.baseUrl}/events`) {
+                this.eventsCache.set(url, response.data);
+            }
+
+            return response.data;
+        } catch (error) {
+            console.error(`Error during ${method.toUpperCase()} request to ${url}:`, error);
+            throw error;
         }
-        
-        return response.data;
     }
 
     async createEvent(event: Event): Promise<Event> {
-        return this.postRequest<Event>(`${this.baseUrl}/events`, event)
-            .catch(error => {
-                console.error('Error creating event:', error);
-                throw error;
-            });
+        return this.makeRequest<Event>(`${this.baseUrl}/events`, 'post', event);
     }
 
     async registerParticipant(eventId: string, participant: Participant): Promise<Participant> {
-        return this.postRequest<Participant>(`${this.baseUrl}/events/${eventId}/participants`, participant)
-            .catch(error => {
-                console.error('Error registering participant:', error);
-                throw error;
-            });
+        return this.makeRequest<Participant>(`${this.baseUrl}/events/${eventId}/participants`, 'post', participant);
     }
 
     async addVendor(eventId: string, vendor: Vendor): Promise<Vendor> {
-        return this.postRequest<Vendor>(`${this.baseUrl}/events/${eventId}/vendors`, vendor)
-            .catch(error => {
-                console.error('Error adding vendor:', error);
-                throw error;
-            });
+        return this.makeRequest<Vendor>(`${this.baseUrl}/events/${eventId}/vendors`, 'post', vendor);
     }
 
     async listEvents(): Promise<Event[]> {
-        return this.getRequest<Event[]>(`${this.baseUrl}/events`)
-            .catch(error => {
-                console.error('Error listing events:', error);
-                throw error;
-            });
+        const cacheKey = `${this.baseUrl}/events`;
+        const cachedEvents = this.eventsCache.get(cacheKey);
+        if (cachedEvents) {
+            return Promise.resolve(cachedEvents);
+        }
+        return this.makeRequest<Event[]>(cacheKey, 'get');
     }
 }
 
