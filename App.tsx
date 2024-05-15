@@ -26,19 +26,40 @@ const EventPlanner: React.FC = () => {
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   useEffect(() => {
+    const fetchEvents = async () => {
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/events`);
+      const data = await response.json();
+      setEvents(data);
+    };
     fetchEvents();
   }, []);
-
-  const fetchEvents = async () => {
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/events`);
-    const data = await response.json();
-    setEvents(data);
-  };
 
   const selectEvent = (eventId: string) => {
     const event = events.find(e => e.id === eventId);
     setSelectedEvent(event);
   };
+
+  const EventListItem = ({ event }: { event: Event }) => (
+    <li onClick={() => selectEvent(event.id)}>
+      {event.name}
+    </li>
+  );
+
+  const ParticipantDetails = ({ participants }: { participants: Participant[] }) => (
+    <ul>
+      {participants.map(participant => (
+        <li key={participant.id}>{participant.name}</li>
+      ))}
+    </ul>
+  );
+
+  const VendorDetails = ({ vendors }: { vendors: Vendor[] }) => (
+    <ul>
+      {vendors.map(vendor => (
+        <li key={vendor.id}>{vendor.name} - Services: {vendor.services.join(', ')}</li>
+      ))}
+    </ul>
+  );
 
   return (
     <div className="event-planner-dashboard">
@@ -46,9 +67,7 @@ const EventPlanner: React.FC = () => {
         <h2>Events</h2>
         <ul>
           {events.map(event => (
-            <li key={event.id} onClick={() => selectEvent(event.id)}>
-              {event.name}
-            </li>
+            <EventListItem key={event.id} event={event} />
           ))}
         </ul>
       </div>
@@ -59,17 +78,9 @@ const EventPlanner: React.FC = () => {
             <p>{selectedEvent.description}</p>
             <p><strong>Date:</strong> {selectedEvent.date}</p>
             <h3>Participants</h3>
-            <ul>
-              {selectedEvent.participants.map(participant => (
-                <li key={participant.id}>{participant.name}</li>
-              ))}
-            </ul>
+            <ParticipantDetails participants={selectedEvent.participants} />
             <h3>Vendors</h3>
-            <ul>
-              {selectedEvent.vendors.map(vendor => (
-                <li key={vendor.id}>{vendor.name} - Services: {vendor.services.join(', ')}</li>
-              ))}
-            </ul>
+            <VendorDetails vendors={selectedEvent.vendors} />
           </div>
         ) : (
           <p>Please select an event to see the details.</p>
