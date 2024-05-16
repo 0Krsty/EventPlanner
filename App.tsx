@@ -21,10 +21,36 @@ interface Vendor {
   services: string[];
 }
 
+// Separate EventListItem into its own component 
+const EventListItem = ({ event, onSelect }: { event: Event; onSelect: (id: string) => void }) => (
+  <li onClick={() => onSelect(event.id)}>
+    {event.name}
+  </li>
+);
+
+// Separate ParticipantDetails into its own component
+const ParticipantDetails = ({ participants }: { participants: Participant[] }) => (
+  <ul>
+    {participants.map(participant => (
+      <li key={participant.id}>{participant.name}</li>
+    ))}
+  </ul>
+);
+
+// Separate VendorDetails into its own component
+const VendorDetails = ({ vendors }: { vendors: Vendor[] }) => (
+  <ul>
+    {vendors.map(vendor => (
+      <li key={vendor.id}>{vendor.name} - Services: {vendor.services.join(', ')}</li>
+    ))}
+  </ul>
+);
+
 const EventPlanner: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
+  // Fetch events once component is mounted
   useEffect(() => {
     const fetchEvents = async () => {
       const response = await fetch(`${process.env.REACT_APP_API_URL}/events`);
@@ -34,32 +60,11 @@ const EventPlanner: React.FC = () => {
     fetchEvents();
   }, []);
 
+  // Event selection handler
   const selectEvent = (eventId: string) => {
     const event = events.find(e => e.id === eventId);
     setSelectedEvent(event);
   };
-
-  const EventListItem = ({ event }: { event: Event }) => (
-    <li onClick={() => selectEvent(event.id)}>
-      {event.name}
-    </li>
-  );
-
-  const ParticipantDetails = ({ participants }: { participants: Participant[] }) => (
-    <ul>
-      {participants.map(participant => (
-        <li key={participant.id}>{participant.name}</li>
-      ))}
-    </ul>
-  );
-
-  const VendorDetails = ({ vendors }: { vendors: Vendor[] }) => (
-    <ul>
-      {vendors.map(vendor => (
-        <li key={vendor.id}>{vendor.name} - Services: {vendor.services.join(', ')}</li>
-      ))}
-    </ul>
-  );
 
   return (
     <div className="event-planner-dashboard">
@@ -67,7 +72,7 @@ const EventPlanner: React.FC = () => {
         <h2>Events</h2>
         <ul>
           {events.map(event => (
-            <EventListItem key={event.id} event={event} />
+            <EventListItem key={event.id} event={event} onSelect={selectEvent} />
           ))}
         </ul>
       </div>
