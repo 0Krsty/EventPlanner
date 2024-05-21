@@ -1,6 +1,7 @@
 package main
 
 import (
+    "context"
     "fmt"
     "log"
     "net/http"
@@ -80,7 +81,6 @@ func ValidateMiddleware(next http.Handler) http.Handler {
             return
         }
 
-        r.Context()
         next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), "props", claims)))
     })
 }
