@@ -2,6 +2,7 @@ package main
 
 import (
     "context"
+    "encoding/json"
     "fmt"
     "log"
     "net/http"
@@ -28,6 +29,11 @@ type Claims struct {
     jwt.StandardClaims
 }
 
+type ErrorResponse struct {
+    ErrorCode    int    `json:"error_code"`
+    ErrorMessage string `json:"error_message"`
+}
+
 func GenerateJWT(username, role string) (string, error) {
     expirationTime := time.Now().Add(5 * time.Minute)
     claims := &Claims{
@@ -39,13 +45,7 @@ func GenerateJWT(username, role string) (string, error) {
     }
 
     token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-    tokenString, err := token.SignedString(mySigningKey)
-
-    if err != nil {
-        return "", err
-    }
-
-    return tokenString, nil
+    return token.SignedString(mySigningKey)
 }
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
@@ -53,12 +53,13 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
+    // In a real application, you'd extract username and role from the request
     username := "testuser"
     role := "organizer"
 
     token, err := GenerateJWT(username, role)
     if err != nil {
-        w.WriteHeader(http.StatusInternalServerError)
+        respondWithError(w, http.StatusInternalServerError, "Error generating token")
         return
     }
 
@@ -76,8 +77,7 @@ func ValidateMiddleware(next http.Handler) http.Handler {
         })
 
         if err != nil || !token.Valid {
-            w.WriteHeader(http.StatusUnauthorized)
-            fmt.Fprintf(w, "Invalid token")
+            respondWithError(w, http.StatusUnauthorized, "Invalid token")
             return
         }
 
@@ -86,21 +86,23 @@ func ValidateMiddleware(next http.Handler) http.Handler {
 }
 
 func EventInfoHandler(w http.ResponseWriter, r *http.Request) {
-    props := r.Context().Value("props").(*Claims)
-    var info string
-
-    switch props.Role {
-    case "organizer":
-        info = "Organizer-level event details"
-    case "participant":
-        info = "Participant-level event details"
-    case "vendor":
-        info = "Vendor-level event details"
-    default:
-        info = "Unknown role"
-    }
+    claims := r.Context().Value("props").(*Claims)
+    info := fmt.Sprintf("%s-level event details", claims.Role)
 
     fmt.Fprintf(w, info)
+}
+
+func respondWithError(w http.ResponseWriter, code int, message string) {
+    response := ErrorResponse{ErrorCode: code, ErrorMessage: message}
+    jsonResponse, err := json.Marshal(response)
+    if err != nil {
+        log.Printf("Error marshalling error response: %s", err)
+        w.WriteHeader(http.StatusInternalServerError)
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(code)
+    w.Write(jsonResponse)
 }
 
 func main() {
