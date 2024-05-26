@@ -45,7 +45,11 @@ func GenerateJWT(username, role string) (string, error) {
     }
 
     token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-    return token.SignedString(mySigningKey)
+    tokenString, err := token.SignedString(mySigningKey)
+    if err != nil {
+        return "", fmt.Errorf("error signing token: %w", err)
+    }
+    return tokenString, nil
 }
 
 func HomeHandler(w http.ResponseWriter, r *http.Request) {
@@ -53,13 +57,12 @@ func HomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
-    // In a real application, you'd extract username and role from the request
     username := "testuser"
     role := "organizer"
 
     token, err := GenerateJWT(username, role)
     if err != nil {
-        respondWithError(w, http.StatusInternalServerError, "Error generating token")
+        respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Error generating token: %v", err))
         return
     }
 
@@ -69,6 +72,11 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 func ValidateMiddleware(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         tokenString := r.Header.Get("Authorization")
+
+        if tokenString == "" {
+            respondWithError(w, http.StatusUnauthorized, "No Authorization token provided")
+            return
+        }
 
         claims := &Claims{}
 
@@ -86,7 +94,11 @@ func ValidateMiddleware(next http.Handler) http.Handler {
 }
 
 func EventInfoHandler(w http.ResponseWriter, r *http.Request) {
-    claims := r.Context().Value("props").(*Claims)
+    claims, ok := r.Context().Value("props").(*Claims)
+    if !ok {
+        respondWithError(w, http.StatusInternalServerError, "Could not extract claims from request context")
+        return
+    }
     info := fmt.Sprintf("%s-level event details", claims.Role)
 
     fmt.Fprintf(w, info)
